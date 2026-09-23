@@ -15,11 +15,13 @@ export async function normalizeIcon(bytes) {
     const meta = await image.metadata();
     if (!["png", "jpeg", "webp"].includes(meta.format) || (meta.pages || 1) > 1)
       throw invalid();
-    return await image
+    const panel = await image
       .rotate()
       .resize(256, 256, { fit: "cover" })
       .png()
       .toBuffer();
+    const minecraft = await sharp(panel).resize(64, 64).png().toBuffer();
+    return { panel, minecraft };
   } catch {
     throw invalid();
   }

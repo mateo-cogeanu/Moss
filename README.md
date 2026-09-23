@@ -33,7 +33,7 @@ The previous `data/` directory is untouched. This version uses a separate `panel
 
 ## Features
 
-- Click a server icon in the server list or header to upload a PNG, JPEG, or WebP (up to 5 MiB and 16 million pixels). Images are center-cropped to 256×256 PNG and kept in `panel-data/icons/`. This customizes the web panel only, not Minecraft’s multiplayer-list `server-icon.png`.
+- Click a server icon in the server list or header to upload a PNG, JPEG, or WebP (up to 5 MiB and 16 million pixels). Images are center-cropped to 256×256 PNG and kept in `panel-data/icons/`. Each upload also writes a 64×64 PNG to the Minecraft server’s `server-icon.png`. Moss shows the change immediately; start or restart Minecraft and refresh its multiplayer list to see the new icon in-game. Reupload existing Moss icons once to apply them to Minecraft.
 
 - Multiple persistent server records, unique configured ports, and configurable JVM heap limits.
 - Start, stop, restart, console input, and a bounded recent-log buffer.

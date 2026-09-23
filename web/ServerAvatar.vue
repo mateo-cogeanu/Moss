@@ -29,7 +29,8 @@ async function upload(event: Event) {
     servers.value = servers.value.map((s) =>
       s.id === id ? { ...s, iconRevision: updated.iconRevision } : s,
     );
-    notice.value = "Server icon updated.";
+    notice.value =
+      "Server icon updated. Minecraft will use it the next time the server starts.";
   } catch (error) {
     notice.value = (error as Error).message;
   } finally {

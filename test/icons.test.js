@@ -41,7 +41,13 @@ test("icons require authentication, validate images, normalize and survive resta
       .toBuffer();
     const uploaded = await request(route, "PUT", bytes);
     assert.equal(uploaded.status, 200);
-    const revision = (await uploaded.json()).iconRevision;
+    let revision = (await uploaded.json()).iconRevision;
+    const minecraftPath = path.join(dir, "servers", s.id, "server-icon.png");
+    let minecraftIcon = await fs.readFile(minecraftPath);
+    const gameMeta = await sharp(minecraftIcon).metadata();
+    assert.equal(gameMeta.format, "png");
+    assert.equal(gameMeta.width, 64);
+    assert.equal(gameMeta.height, 64);
     for (const invalid of [
       Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),
       Buffer.from("not an image"),
@@ -56,6 +62,45 @@ test("icons require authentication, validate images, normalize and survive resta
     const meta = await sharp(Buffer.from(await image.arrayBuffer())).metadata();
     assert.equal(meta.width, 256);
     assert.equal(meta.height, 256);
+    assert.deepEqual(await fs.readFile(minecraftPath), minecraftIcon);
+    const replacement = await sharp({
+      create: { width: 90, height: 140, channels: 3, background: "#ff0000" },
+    })
+      .png()
+      .toBuffer();
+    const replaced = await request(route, "PUT", replacement);
+    assert.equal(replaced.status, 200);
+    const nextRevision = (await replaced.json()).iconRevision;
+    assert.notEqual(nextRevision, revision);
+    revision = nextRevision;
+    assert.notDeepEqual(await fs.readFile(minecraftPath), minecraftIcon);
+    minecraftIcon = await fs.readFile(minecraftPath);
+    const panelIcon = Buffer.from(await (await request(route)).arrayBuffer());
+    const outside = path.join(dir, "untouched.png");
+    await fs.writeFile(outside, "untouched");
+    await fs.rm(minecraftPath);
+    await fs.symlink(outside, minecraftPath);
+    assert.equal((await request(route, "PUT", bytes)).status, 403);
+    assert.equal(await fs.readFile(outside, "utf8"), "untouched");
+    assert.deepEqual(
+      Buffer.from(await (await request(route)).arrayBuffer()),
+      panelIcon,
+    );
+    await fs.rm(minecraftPath);
+    await fs.mkdir(minecraftPath);
+    assert.equal((await request(route, "PUT", bytes)).status, 400);
+    assert.deepEqual(
+      Buffer.from(await (await request(route)).arrayBuffer()),
+      panelIcon,
+    );
+    await fs.rmdir(minecraftPath);
+    await fs.writeFile(minecraftPath, minecraftIcon);
+    assert.equal(
+      (await fs.readdir(path.dirname(minecraftPath))).some((name) =>
+        name.endsWith(".tmp"),
+      ),
+      false,
+    );
     await backend.close();
     await start();
     const login = await fetch(base + "/login", {
@@ -68,6 +113,7 @@ test("icons require authentication, validate images, normalize and survive resta
     });
     user.cookie = login.headers.get("set-cookie").split(";")[0];
     assert.equal((await request(route)).status, 200);
+    assert.deepEqual(await fs.readFile(minecraftPath), minecraftIcon);
     assert.equal(
       (await (await request(`/servers/${s.id}`)).json()).iconRevision,
       revision,

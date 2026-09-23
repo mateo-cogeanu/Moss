@@ -482,15 +482,24 @@ export async function createBackend({
             const image = await normalizeIcon(
               await readBody(req, 5 * 1024 * 1024),
             );
+            const minecraftTarget = await safe(s, "server-icon.png", true);
+            const minecraftTmp =
+              minecraftTarget + "." + crypto.randomUUID() + ".tmp";
             const folder = path.join(root, "icons");
             await fs.mkdir(folder, { recursive: true, mode: 0o700 });
             const target = path.join(folder, s.id + ".png"),
               tmp = target + ".tmp";
             try {
-              await fs.writeFile(tmp, image, { mode: 0o600 });
+              await fs.writeFile(tmp, image.panel, { mode: 0o600 });
+              await fs.writeFile(minecraftTmp, image.minecraft, {
+                mode: 0o600,
+                flag: "wx",
+              });
+              await fs.rename(minecraftTmp, minecraftTarget);
               await fs.rename(tmp, target);
             } finally {
               await fs.rm(tmp, { force: true });
+              await fs.rm(minecraftTmp, { force: true });
             }
             s.iconRevision = crypto.randomUUID();
             await save();

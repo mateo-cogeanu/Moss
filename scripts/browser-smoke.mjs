@@ -114,7 +114,12 @@ try {
   await (
     await iconChooser
   ).setFiles({ name: "custom-icon.png", mimeType: "image/png", buffer: icon });
-  await page.getByText("Server icon updated.", { exact: true }).waitFor();
+  await page
+    .getByText(
+      "Server icon updated. Minecraft will use it the next time the server starts.",
+      { exact: true },
+    )
+    .waitFor();
   await page
     .getByRole("img", { name: "Local survival icon", exact: true })
     .waitFor();
@@ -136,7 +141,12 @@ try {
   await (
     await listChooser
   ).setFiles({ name: "replacement.png", mimeType: "image/png", buffer: icon });
-  await page.getByText("Server icon updated.", { exact: true }).waitFor();
+  await page
+    .getByText(
+      "Server icon updated. Minecraft will use it the next time the server starts.",
+      { exact: true },
+    )
+    .waitFor();
   await page.getByRole("button", { name: "Dismiss", exact: true }).click();
   await page.getByRole("link", { name: /Local survival.*Java server/ }).click();
   await page.waitForTimeout(1200);
@@ -144,6 +154,12 @@ try {
   await page.screenshot({ path: "artifacts/overview.png", fullPage: true });
 
   const id = page.url().split("/").at(-1);
+  const gameIcon = await sharp(
+    path.join(root, "servers", id, "server-icon.png"),
+  ).metadata();
+  assert.equal(gameIcon.format, "png");
+  assert.equal(gameIcon.width, 64);
+  assert.equal(gameIcon.height, 64);
   assert.equal(
     await fs.readFile(
       path.join(root, "servers", id, "world", "region", "r.0.0.mca"),
