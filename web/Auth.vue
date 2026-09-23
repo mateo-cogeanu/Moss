@@ -75,14 +75,14 @@ async function submit() {
 function downloadCodes() {
   const blob = new Blob(
     [
-      `Server panel recovery codes for ${username.value}\nEach code can be used once instead of an authenticator code. Keep these private.\n\n${recovery.value.join("\n")}\n`,
+      `Moss recovery codes for ${username.value}\nEach code can be used once instead of an authenticator code. Keep these private.\n\n${recovery.value.join("\n")}\n`,
     ],
     { type: "text/plain" },
   );
   const url = URL.createObjectURL(blob),
     link = document.createElement("a");
   link.href = url;
-  link.download = "server-panel-recovery-codes.txt";
+  link.download = "moss-recovery-codes.txt";
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -124,7 +124,7 @@ function downloadCodes() {
           enrollment
             ? "Set up two-factor authentication"
             : mode === "login"
-              ? "Sign in to your server panel"
+              ? "Sign in to Moss"
               : "Create your account"
         }}
       </h1>

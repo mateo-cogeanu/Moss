@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
-const UA = "SelfHostedServerPanel/0.1 (personal server administration)";
+const UA = "Moss/0.1 (personal server administration)";
 const hosts = new Set([
   "piston-meta.mojang.com",
   "piston-data.mojang.com",

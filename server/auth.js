@@ -248,7 +248,7 @@ export async function createAuth(root, adminKey) {
           send(200, {
             enrollment,
             secret,
-            uri: `otpauth://totp/${encodeURIComponent("Server panel:" + username)}?secret=${secret}&issuer=Server%20panel&algorithm=SHA1&digits=6&period=30`,
+            uri: `otpauth://totp/${encodeURIComponent("Moss:" + username)}?secret=${secret}&issuer=Moss&algorithm=SHA1&digits=6&period=30`,
           });
         } else if (pathname === "/api/register/finish") {
           const p = pending.get(body.enrollment);

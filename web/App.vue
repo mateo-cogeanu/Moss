@@ -195,7 +195,7 @@ const tabs = [
       <RouterLink
         to="/"
         class="flex items-center gap-3 text-xl font-bold text-contrast no-underline"
-        ><ServerIcon class="size-7 text-green" /> Server panel</RouterLink
+        ><ServerIcon class="size-7 text-green" /> Moss</RouterLink
       >
       <div class="flex flex-wrap items-center gap-3">
         <Button v-if="authenticated" @click="showAccount = !showAccount"

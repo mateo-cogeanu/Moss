@@ -12,6 +12,7 @@ Changes are recorded from 2026-09-23 onward.
 - README documentation for custom icons and the sharp image-processing dependency.
 
 ### Changed
+- Applied Moss branding to the README, browser title, header, sign-in screen, recovery-code downloads, startup logs, package metadata, and catalog request user agent. New authenticator enrollments use the Moss issuer; existing accounts, 2FA secrets, cookies, and data paths remain compatible. Updated browser selectors and test-directory names.
 - Switched to a main-only workflow: `main` is the default and working branch; future updates are committed and pushed directly to it unless the user requests otherwise. Replaces the initial `codex/initial-moss` branch without discarding its history.
 - Named the project Moss and recorded `https://github.com/mateo-cogeanu/Moss.git` as the publishing destination in `AGENTS.md`. Publishing must use terminal Git/GitHub CLI commands, not a skill.
 

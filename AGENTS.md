@@ -1,5 +1,6 @@
 # Moss project instructions
 
+- Use **Moss** as the product name in UI text, documentation, logs, and new integrations. Preserve existing persistent storage paths and authentication identifiers when renaming text to avoid breaking deployed instances.
 - Maintain the original Modrinth-derived UI and existing local backend conventions. Preserve upstream licenses and attribution.
 - Update `changelog.md` for every project change from 2026-09-23 onward. Add dated entries describing features, fixes, configuration/documentation changes, and relevant validation. Do not invent historical entries.
 - After completing and validating changes, commit and push them to `https://github.com/mateo-cogeanu/Moss.git`. Use terminal commands (`git` for commits and pushes and the GitHub CLI `gh` when needed); do not use a GitHub skill or browser-based publishing workflow. Do not publish to another repository. Work directly on `main` and commit and push changes to `main`. Do not create feature branches or pull requests unless the user explicitly requests them. Keep `main` as the GitHub default branch.

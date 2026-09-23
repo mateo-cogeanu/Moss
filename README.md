@@ -1,6 +1,6 @@
-# Self-hosted server panel
+# Moss
 
-A browser-based Minecraft server panel using **Modrinth's original Vue UI components** and a local Node.js backend. No launcher, Tauri runtime, Modrinth account, or Modrinth Hosting subscription is required.
+Moss is a self-hosted Minecraft management app for your browser, using **Modrinth's original Vue UI components** and a local Node.js backend. No launcher, Tauri runtime, Modrinth account, or Modrinth Hosting subscription is required.
 
 The console, console filters/search/fullscreen, resource cards, content list, installation settings, file browser/editor, backup cards, buttons, dialogs, icons, colors, and styles come from the pinned Modrinth source in `vendor/modrinth`. The browser shell, local sign-in, server creation, settings form, and backend are specific to this project. This is an independent adaptation, not the complete Modrinth Hosting product or its private backend.
 
@@ -14,7 +14,7 @@ npm run build
 npm start
 ```
 
-Open **http://127.0.0.1:3000** and choose **Create an account**. Enter a username, a password of at least 12 characters, and the admin key from `panel-data/admin-token` (the server prints the file location, not the secret). Scan the QR code with an authenticator app and verify its six-digit code to finish registration. Save the ten one-time recovery codes somewhere private.
+Open Moss at **http://127.0.0.1:3000** and choose **Create an account**. Enter a username, a password of at least 12 characters, and the admin key from `panel-data/admin-token` (the server prints the file location, not the secret). Scan the QR code with an authenticator app and verify its six-digit code to finish registration. Save the ten one-time recovery codes somewhere private.
 
 Future sign-ins require only your username, password, and authenticator code (or one unused recovery code). The admin key cannot sign in or bypass 2FA; it authorizes creation of another account. **Every registered account has full access to all servers**, so share the key only with trusted administrators. Existing servers are preserved when upgrading from token login; create your first account with the existing key. Passwords are stored as salted scrypt hashes, authenticator secrets are encrypted with `panel-data/auth-key`, and recovery codes are hashed. Back up the complete data directory, including `auth-key` and `users.json`, together. Keep the host clock synchronized for authenticator codes. Click your username in the header to change your password; this signs out your other sessions.
 

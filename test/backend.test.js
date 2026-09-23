@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { createBackend } from "../server/backend.js";
 test("authenticated lifecycle, file boundaries, uploads, backups, and persistence", async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "serverui-test-"));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "moss-test-"));
   let backend;
   let cookie = "";
   try {

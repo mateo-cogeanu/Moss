@@ -7,7 +7,7 @@ const port = Number(process.env.PORT || 3000),
   host = process.env.HOST || "127.0.0.1";
 backend.server.listen(port, host, () =>
   console.log(
-    `Server panel: http://${host}:${port}\nAdmin token file: ${backend.root}/admin-token`,
+    `Moss: http://${host}:${port}\nAdmin token file: ${backend.root}/admin-token`,
   ),
 );
 let closing = false;

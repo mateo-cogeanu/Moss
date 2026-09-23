@@ -8,7 +8,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import assert from "node:assert/strict";
-const root = await fs.mkdtemp(path.join(os.tmpdir(), "serverui-browser-"));
+const root = await fs.mkdtemp(path.join(os.tmpdir(), "moss-browser-"));
 const backend = await createBackend({
   dataDir: root,
   java: path.resolve("test/fake-java.js"),
@@ -122,7 +122,7 @@ try {
   await page
     .getByRole("img", { name: "Local survival icon", exact: true })
     .waitFor();
-  await page.getByRole("link", { name: "Server panel", exact: true }).click();
+  await page.getByRole("link", { name: "Moss", exact: true }).click();
   await page
     .getByRole("img", { name: "Local survival icon", exact: true })
     .waitFor();
