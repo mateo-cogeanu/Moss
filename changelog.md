@@ -12,6 +12,7 @@ Changes are recorded from 2026-09-23 onward.
 - README documentation for custom icons and the sharp image-processing dependency.
 
 ### Changed
+- Switched to a main-only workflow: `main` is the default and working branch; future updates are committed and pushed directly to it unless the user requests otherwise. Replaces the initial `codex/initial-moss` branch without discarding its history.
 - Named the project Moss and recorded `https://github.com/mateo-cogeanu/Moss.git` as the publishing destination in `AGENTS.md`. Publishing must use terminal Git/GitHub CLI commands, not a skill.
 
 ### Validation
