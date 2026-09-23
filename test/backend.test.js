@@ -148,6 +148,7 @@ test("authenticated lifecycle, file boundaries, uploads, backups, and persistenc
       await new Promise((r) => setTimeout(r, 100));
     }
     assert.equal(snapshot.server.status, "running");
+    assert.equal(backend.beginUpdate(), false);
     assert.ok(snapshot.logs.some((l) => l.text.includes("say hello")));
     await request(prefix + "/power", "POST", { action: "restart" });
     await request(prefix + "/power", "POST", { action: "stop" });

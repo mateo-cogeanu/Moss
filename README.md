@@ -55,8 +55,41 @@ Console/status updates use polling every 2.5 seconds through the original UI's p
 | `DATA_DIR` | `./panel-data` | Persistent accounts, encryption key, admin key, servers, and backups |
 | `JAVA_BIN` | `java` | Java executable path |
 | `SECURE_COOKIE` | `false` | Set `true` when serving through HTTPS |
+| `AUTO_UPDATE` | `false` | Enable automatic main-branch updates under Linux user systemd |
+| `MOSS_SERVICE_NAME` | `serverui.service` | User systemd unit to restart during updates |
 
 For deployment, use an HTTPS reverse proxy and set `SECURE_COOKIE=true` so passwords, authenticator codes, and sessions are protected in transit. Bind the panel to localhost behind the proxy (or a private interface). Preserve the browser's Host header at the proxy because the backend checks request origins. Use a dedicated OS account: server JARs run with the panel process's permissions, not in a sandbox. Stop the panel gracefully to stop its managed servers. A second panel cannot use the same data directory concurrently; a stale lock is recovered after its owner exits.
+
+## Automatic Moss updates (Linux user systemd)
+
+Automatic updates are opt-in. They require a clean Git clone on `main`, the HTTPS origin `https://github.com/mateo-cogeanu/Moss.git`, Git/npm on the service PATH, a supported Node runtime, and Moss running as a **user systemd service**. This supports the existing `serverui.service`; it does not support Docker, root system services or plain `npm start` supervision.
+
+For an existing installation at `~/Moss`, stop the Minecraft servers in Moss, then perform this one-time setup:
+
+```sh
+cd ~/Moss
+git pull --ff-only && npm ci && npm run build &&
+node scripts/enable-auto-updates.mjs &&
+systemctl --user restart serverui.service
+```
+
+Pass a different service name to the setup script if needed, e.g. `node scripts/enable-auto-updates.mjs moss.service`. It verifies that the service's working directory is this clone, writes a user service environment override and reloads systemd. On an always-on server, enable user lingering once with `sudo loginctl enable-linger "$USER"` so user services remain available after logout.
+
+Moss checks one minute after startup, then every 15 minutes. An update waits until **all Minecraft processes are stopped and there are no active operations**. It then temporarily rejects new changes, starts a separate `moss-update.service`, stops Moss, fast-forwards to the checked commit on `origin/main`, runs `npm ci` and `npm run build`, and starts Moss again. There is a brief panel outage, and you must sign in again. A running Minecraft server is never stopped just to apply an update, so an always-running game server keeps the update pending until you stop it. The panel displays update status when signed in.
+
+The worker keeps the previous `node_modules` and `dist` in a temporary sibling directory. Install/build/startup-check failures trigger rollback of its own code update and restoration of those saved directories. Accounts, worlds and backups are not moved or deleted. This is code/build recovery, **not a rollback of data migrations a future version might perform**; keep regular backups. Recovery can still require manual intervention after a power failure or disk error; retained `.moss-update-*` directories contain recovery files. Make sure there is enough free disk space for old and new dependencies/builds together.
+
+Failed revisions are recorded under Git's metadata directory and are not retried automatically until a newer commit arrives. Inspect logs and fix the cause before manually clearing that marker:
+
+```sh
+journalctl --user -u moss-update.service -u serverui.service -n 100 --no-pager
+# Only after addressing the failure, retry at the next scheduled check:
+rm -f "$(git rev-parse --git-path moss-update-failure.json)"
+```
+
+To disable updates, set `Environment=AUTO_UPDATE=false` in `~/.config/systemd/user/serverui.service.d/moss-updates.conf`, run `systemctl --user daemon-reload`, and restart Moss after stopping Minecraft. This updater tracks every new commit on `main`; it does not automatically update Minecraft JARs, Java, mods or plugins.
+
+See [the Modrinth feature comparison](docs/modrinth-feature-gaps.md) for missing and partial features in Moss relative to its pinned source.
 
 ## Development and validation
 

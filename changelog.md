@@ -5,6 +5,8 @@ Changes are recorded from 2026-09-23 onward.
 ## 2026-09-23
 
 ### Added
+- Opt-in automatic Moss updates for Linux user systemd deployments: startup/15-minute checks of the official main branch, deferred installation until all Minecraft servers and operations stop, an independent update worker, clean-checkout/fast-forward checks, build/dependency recovery and startup health checks. Failed revisions are remembered to prevent retry loops.
+- Signed-in update status, a one-time setup script, deployment/recovery instructions, and a source-backed inventory of missing/partial Modrinth UI features.
 - Clickable server icons on the server list and server detail header, with keyboard-accessible image upload controls and upload feedback.
 - Authenticated PNG, JPEG, and WebP uploads, limited to 5 MiB and 16 million pixels. Images are decoded, oriented, center-cropped, stripped of metadata, and stored as 256×256 PNGs. SVG, animated and invalid images are rejected.
 - Persistent web-panel icons stored under `panel-data/icons/`, usable without stopping Minecraft. Initially customized the web panel only; see the update below.
@@ -18,8 +20,9 @@ Changes are recorded from 2026-09-23 onward.
 - Named the project Moss and recorded `https://github.com/mateo-cogeanu/Moss.git` as the publishing destination in `AGENTS.md`. Publishing must use terminal Git/GitHub CLI commands, not a skill.
 
 ### Validation
+- Updater tests cover dirty/wrong-branch/wrong-origin/diverged checkouts, busy deferral, worker launch failure, successful installation, npm/build/health-check failures, rollback, preserved data, failed-revision suppression and maintenance admission. Systemd operations are simulated in tests; the home Linux deployment still needs its one-time setup.
 - Icon synchronization checks cover 64×64 Minecraft PNG creation, replacement, persistence, invalid uploads leaving the game icon intact, and symbolic-link/directory rejection without changing the panel icon. Browser checks verify that UI uploads create the game icon.
-- Eight backend tests pass, including image validation, authentication, upload limits, and persistence across backend restart.
+- Twelve backend tests pass, including image validation, authentication, upload limits, and persistence across backend restart.
 - Production build passes.
 - Browser checks pass, including icon upload and replacement from both locations, persistence after page reload, and existing account/server workflows.
 - Upstream integrity check passes for all 1,529 vendored files.

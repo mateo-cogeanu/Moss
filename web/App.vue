@@ -6,6 +6,7 @@ import TooltipDirective from "#ui/components/floating/TooltipDirective.vue";
 import Auth from "./Auth.vue";
 import Account from "./Account.vue";
 import ServerAvatar from "./ServerAvatar.vue";
+import Updates from "./Updates.vue";
 import {
   ServerIcon,
   PlusIcon,
@@ -221,6 +222,7 @@ const tabs = [
     </div>
     <Auth v-if="!authenticated" />
     <template v-else>
+      <Updates />
       <Account v-if="showAccount" />
       <template v-if="!route.params.id">
         <div class="mb-6 flex items-center justify-between">

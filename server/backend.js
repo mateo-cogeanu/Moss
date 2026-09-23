@@ -18,6 +18,11 @@ export async function createBackend({
   staticDir = "./dist",
   token: configuredToken,
   fetcher = fetch,
+  updateStatus = () => ({
+    enabled: false,
+    status: "disabled",
+    message: "Automatic updates are disabled.",
+  }),
 } = {}) {
   const catalog = createCatalog(fetcher);
   const root = path.resolve(dataDir),
@@ -66,7 +71,9 @@ export async function createBackend({
   const runtime = new Map(),
     locks = new Map();
   let saveQueue = Promise.resolve(),
-    closing = false;
+    closing = false,
+    updating = false,
+    activeRequests = 0;
   async function save() {
     const content = JSON.stringify(records, null, 2);
     saveQueue = saveQueue.then(async () => {
@@ -303,6 +310,7 @@ export async function createBackend({
     };
   }
   const server = http.createServer(async (req, res) => {
+    activeRequests++;
     const send = (status, value) => {
       res.writeHead(status, {
         "Content-Type": "application/json",
@@ -312,7 +320,14 @@ export async function createBackend({
       res.end(JSON.stringify(value));
     };
     try {
+      if (updating && !["GET", "HEAD"].includes(req.method))
+        throw fail(
+          503,
+          "Moss is updating. Please wait for the panel to restart.",
+        );
       const url = new URL(req.url, "http://localhost");
+      if (url.pathname === "/api/health" && req.method === "GET")
+        return send(200, { application: "Moss" });
       const origin = req.headers.origin;
       if (origin && new URL(origin).host !== req.headers.host)
         throw fail(403, "Cross-origin requests are forbidden.");
@@ -320,6 +335,8 @@ export async function createBackend({
         if (await auth.handle(req, res, url.pathname, jsonBody, send)) return;
         const user = auth.session(req);
         if (!user) throw fail(401, "Sign in to your account.");
+        if (url.pathname === "/api/updates" && req.method === "GET")
+          return send(200, updateStatus());
         if (url.pathname === "/api/session")
           return send(200, { username: user.username });
         if (url.pathname === "/api/world-imports" && req.method === "PUT") {
@@ -1042,12 +1059,29 @@ export async function createBackend({
         { error: e.status || e.code ? e.message : "Internal server error." },
       );
       if (!e.status && !e.code) console.error(e);
+    } finally {
+      activeRequests--;
     }
   });
   return {
     server,
     root,
     token,
+    beginUpdate() {
+      if (
+        closing ||
+        updating ||
+        activeRequests ||
+        locks.size ||
+        [...runtime.values()].some((r) => r.child)
+      )
+        return false;
+      updating = true;
+      return true;
+    },
+    endUpdate() {
+      updating = false;
+    },
     async close() {
       closing = true;
       await Promise.all(records.map((s) => stop(s)));
