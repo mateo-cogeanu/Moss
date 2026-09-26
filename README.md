@@ -4,6 +4,32 @@ Moss is a self-hosted Minecraft management app for your browser, using **Modrint
 
 The console, console filters/search/fullscreen, resource cards, content list, installation settings, file browser/editor, backup cards, buttons, dialogs, icons, colors, and styles come from the pinned Modrinth source in `vendor/modrinth`. The browser shell, local sign-in, server creation, settings form, and backend are specific to this project. This is an independent adaptation, not the complete Modrinth Hosting product or its private backend.
 
+## Linux service setup
+
+With Node.js 22+, npm, Git and a compatible Java runtime installed, run as the Linux account that owns your clone (for example `minecraft`):
+
+```sh
+cd ~/Moss
+./setup.sh
+```
+
+The script installs project dependencies (including build tools), builds the UI, creates `serverui.service` if missing, enables it, enables user lingering for startup without logging in, starts Moss, and checks HTTP health. Enabling lingering may ask for your sudo password; **do not run the whole script with sudo**. Node, Java and OS packages are prerequisites and are not installed or upgraded by this script.
+
+Existing service files and drop-ins are preserved, including HTTPS cookie settings, automatic updates and custom data paths. The service must already point at this clone; setup refuses to silently migrate an old installation. Re-running setup stops the existing service gracefully, which also stops running Minecraft servers. Start those servers again in Moss afterward. If dependency installation or building fails, setup leaves Moss stopped and reports the failure; fix the error and rerun the script. Existing accounts, worlds and backups are not deleted.
+
+Fresh installations bind to localhost on port 3000. Use an HTTPS reverse proxy for remote browser access. For a fresh service behind an existing HTTPS proxy, with automatic updates enabled:
+
+```sh
+SECURE_COOKIE=true AUTO_UPDATE=true ./setup.sh
+```
+
+Fresh service defaults can also be overridden with `HOST`, `PORT`, `DATA_DIR`, `JAVA_BIN`, and `MOSS_SERVICE_NAME`; run `./setup.sh --help` for details. Those environment overrides do not rewrite an existing service. The default unit remains `serverui.service` for compatibility with deployed Moss installations. HTTPS certificates, DNS, firewall rules and Minecraft JAR installation are separate steps.
+
+```sh
+systemctl --user status serverui --no-pager
+journalctl --user -u serverui -n 100 --no-pager
+```
+
 ## Run
 
 Requires Node.js 22+, macOS or Linux, and Java appropriate for your Minecraft server. The panel runs Java processes directly on the same host; it does not use Docker or SSH.

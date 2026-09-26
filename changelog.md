@@ -2,6 +2,17 @@
 
 Changes are recorded from 2026-09-23 onward.
 
+## 2026-09-26
+
+### Added
+- Executable `setup.sh` for Linux user-systemd installation: prerequisite checks, npm dependency installation, production build, service creation/enabling, user lingering, startup and HTTP health verification.
+- Repeat setup preserves existing service/drop-in settings and persistent data. Setup rejects root execution, mismatched existing service directories and concurrent automatic updates. Fresh-service settings support quoted paths and environment overrides.
+- README setup instructions, configuration boundaries, and build-failure recovery instructions.
+
+### Validation
+- All 13 automated tests pass.
+- Bash syntax/help checks and command-fixture tests cover fresh service creation, existing configuration preservation, paths with spaces/percent signs, mismatched paths, build failure and active-update refusal. Tests simulate systemd and the HTTP health response; the script has not been run on the home Linux server.
+
 ## 2026-09-23
 
 ### Added
