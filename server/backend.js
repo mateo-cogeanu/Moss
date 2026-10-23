@@ -1,3 +1,4 @@
+import { installForge } from "./forge.js";
 import { createCatalog, safeFilename } from "./catalog.js";
 import http from "node:http";
 import { normalizeIcon } from "./icons.js";
@@ -68,6 +69,7 @@ export async function createBackend({
   } catch (e) {
     if (e.code !== "ENOENT") throw e;
   }
+  const forgeInstalls = new Map();
   const runtime = new Map(),
     locks = new Map();
   let saveQueue = Promise.resolve(),
@@ -165,9 +167,24 @@ export async function createBackend({
     if (closing) throw fail(503, "Panel is shutting down.");
     if (runtime.get(s.id)?.child) throw fail(409, "Server is already running.");
     const jar = s.jar || "server.jar";
-    await safe(s, jar);
-    if (!(await fs.stat(path.join(directory(s), jar))).isFile())
-      throw fail(400, "Selected JAR must be a regular file.");
+    const launch = s.installation?.launch;
+    if (launch?.type === "forge-args") {
+      if (!/^forge-runtime-[a-f0-9-]+\/moss_args\.txt$/.test(launch.argsFile))
+        throw fail(400, "Invalid Forge launch path.");
+      await tree(await safe(s, launch.argsFile.split("/")[0]));
+      if (launch.sharedLibraries) {
+        if (!/^forge-[0-9.]+-[0-9.]+-shim\.jar$/.test(launch.shim))
+          throw fail(400, "Invalid Forge launcher path.");
+        await safe(s, launch.shim);
+        await tree(await safe(s, "libraries"));
+      }
+      if (!(await fs.stat(await safe(s, launch.argsFile))).isFile())
+        throw fail(400, "Forge launch arguments are missing. Reinstall Forge.");
+    } else {
+      await safe(s, jar);
+      if (!(await fs.stat(path.join(directory(s), jar))).isFile())
+        throw fail(400, "Selected JAR must be a regular file.");
+    }
     const eula = await fs.readFile(await safe(s, "eula.txt"), "utf8");
     if (!/^eula=true\s*$/m.test(eula))
       throw fail(400, "Accept the Minecraft EULA before starting.");
@@ -176,8 +193,9 @@ export async function createBackend({
       [
         `-Xms${Math.min(s.memory, 1024)}M`,
         `-Xmx${s.memory}M`,
-        "-jar",
-        jar,
+        ...(launch?.type === "forge-args"
+          ? ["@" + launch.argsFile]
+          : ["-jar", jar]),
         "nogui",
       ],
       { cwd: directory(s), stdio: ["pipe", "pipe", "pipe"] },
@@ -560,7 +578,9 @@ export async function createBackend({
             )
               throw fail(400, "Select an existing executable JAR.");
             if (
-              !["vanilla", "fabric", "paper", "custom"].includes(b.platform) ||
+              !["vanilla", "fabric", "forge", "paper", "custom"].includes(
+                b.platform,
+              ) ||
               typeof b.version !== "string" ||
               b.version.length > 80
             )
@@ -582,6 +602,38 @@ export async function createBackend({
             if (b.confirm !== true)
               throw fail(400, "Confirm the server software change.");
             const d = await catalog.artifact(b.platform, b.version, b.loader);
+            if (closing) throw fail(503, "Moss is shutting down.");
+            if (d.forge) {
+              const controller = new AbortController();
+              const task = installForge({
+                catalog,
+                descriptor: d,
+                directory: await safe(s, ""),
+                java,
+                signal: controller.signal,
+                log: (text) => log(s.id, "[Forge] " + text),
+              });
+              forgeInstalls.set(s.id, { controller, task });
+              let launch;
+              try {
+                launch = await task;
+              } finally {
+                forgeInstalls.delete(s.id);
+              }
+              s.installation = {
+                platform: "forge",
+                version: b.version,
+                loader: b.loader,
+                source: "official",
+                launch,
+              };
+              await save();
+              log(
+                s.id,
+                "[Panel] Forge installed. Existing worlds, mods and previous runtimes were kept.",
+              );
+              return send(200, info(s));
+            }
             const jar = `${b.platform}-${b.version}-${b.loader || "release"}-${crypto.randomUUID().slice(0, 8)}.jar`;
             safeFilename(jar);
             const target = await safe(s, jar, true);
@@ -1084,6 +1136,8 @@ export async function createBackend({
     },
     async close() {
       closing = true;
+      for (const { controller } of forgeInstalls.values()) controller.abort();
+      await Promise.allSettled([...forgeInstalls.values()].map((v) => v.task));
       await Promise.all(records.map((s) => stop(s)));
       await saveQueue;
       await new Promise((resolve) => server.close(resolve));

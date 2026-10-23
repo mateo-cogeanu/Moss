@@ -8,7 +8,15 @@ export async function catalogFixture(url) {
   const u = new URL(url),
     p = u.pathname;
   let data;
-  if (p.endsWith("version_manifest_v2.json"))
+  if (p.endsWith("maven-metadata.json"))
+    data = {
+      "1.12.2": ["1.12.2-14.23.5.2860"],
+      "1.21.11": ["1.21.11-61.0.1", "1.21.11-61.0.2"],
+    };
+  else if (p.endsWith("promotions_slim.json"))
+    data = { promos: { "1.21.11-recommended": "61.0.1" } };
+  else if (p.endsWith(".jar.sha1")) return new Response(hashes.sha1);
+  else if (p.endsWith("version_manifest_v2.json"))
     data = {
       versions: [
         {
@@ -68,7 +76,7 @@ export async function catalogFixture(url) {
       project_id: id === "dep-v" ? "dependency" : "testmod",
       version_number: "1.0",
       game_versions: ["1.21.11"],
-      loaders: ["fabric"],
+      loaders: ["fabric", "forge"],
       dependencies:
         id === "mod-v"
           ? [{ dependency_type: "required", version_id: "dep-v" }]

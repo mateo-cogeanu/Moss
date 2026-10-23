@@ -44,12 +44,14 @@ async function ensure() {
         "/installation/catalog?platform=" + platform.value,
       );
     if (
-      platform.value === "paper" &&
+      ["paper", "forge"].includes(platform.value) &&
       version.value &&
-      !paperBuilds.value[version.value]
+      !paperBuilds.value[platform.value + ":" + version.value]
     )
-      paperBuilds.value[version.value] = await call(
-        "/installation/builds?platform=paper&version=" +
+      paperBuilds.value[platform.value + ":" + version.value] = await call(
+        "/installation/builds?platform=" +
+          platform.value +
+          "&version=" +
           encodeURIComponent(version.value),
       );
   } catch (e) {
@@ -60,7 +62,7 @@ watch([platform, version], ensure);
 async function install(p: string, v: string, l: string | null) {
   if (
     !confirm(
-      `Install ${p} ${v}? This changes the selected startup JAR. Your existing JARs and world files will be kept. Back up your world before changing Minecraft versions.`,
+      `Install ${p} ${v}? This changes the server startup software. Forge installation can take several minutes. Your existing JARs and world files will be kept. Back up your world before changing Minecraft versions.`,
     )
   )
     throw new Error("Installation cancelled.");
@@ -100,7 +102,13 @@ const unsupported = async () => {
 provideInstallationSettings({
   loading,
   installationInfo: computed(() => [
-    { label: "Startup JAR", value: current.value.jar || "server.jar" },
+    {
+      label: "Startup",
+      value:
+        current.value.installation?.launch?.argsFile ||
+        current.value.jar ||
+        "server.jar",
+    },
     {
       label: "Source",
       value: current.value.installation?.source || "Not installed",
@@ -110,7 +118,7 @@ provideInstallationSettings({
   isBusy: computed(() => busy.value || current.value.status !== "stopped"),
   busyMessage: computed(() =>
     busy.value
-      ? "Downloading server software…"
+      ? "Installing server software… See the console for Forge installer output."
       : "Stop the server to change software.",
   ),
   modpack: ref(null),
@@ -122,7 +130,7 @@ provideInstallationSettings({
     () => current.value.installation?.loader || "",
   ),
   requiresInstallation: computed(() => !current.value.installation),
-  availablePlatforms: ["vanilla", "fabric", "paper"],
+  availablePlatforms: ["vanilla", "fabric", "forge", "paper"],
   editingPlatformRef: platform,
   editingGameVersionRef: version,
   resolveGameVersions: (p, snapshots) =>
@@ -130,8 +138,8 @@ provideInstallationSettings({
       (v: any) => snapshots || v.stable,
     ),
   resolveLoaderVersions: (p, v) =>
-    p === "paper"
-      ? paperBuilds.value[v] || []
+    ["paper", "forge"].includes(p)
+      ? paperBuilds.value[p + ":" + v] || []
       : catalogs.value[p]?.loaders || [],
   resolveHasSnapshots: (p) =>
     (catalogs.value[p]?.versions || []).some((v: any) => !v.stable),
@@ -170,9 +178,10 @@ onMounted(async () => {
         Server software
       </h2>
       <p class="text-secondary">
-        Install Vanilla, Fabric, or a stable Paper build from its official
-        source. Forge and NeoForge launch scripts are not supported yet. Use a
-        Java version compatible with your selected release.
+        Install Vanilla, Fabric, Forge (Minecraft 1.17+), or a stable Paper
+        build from its official source. Forge downloads its libraries using the
+        selected Java runtime. Use a Java version compatible with your selected
+        release.
       </p>
       <Layout />
     </div>
@@ -185,7 +194,8 @@ onMounted(async () => {
       </h2>
       <p class="m-0 text-secondary">
         Upload a runnable JAR in Files, then select it here. Choose its actual
-        platform and game version to filter compatible mods/plugins.
+        platform and game version to filter compatible mods/plugins. A Forge
+        installer JAR cannot be used here; select Forge above to install it.
       </p>
       <Combobox
         v-model="jar"
@@ -198,6 +208,7 @@ onMounted(async () => {
             <option value="custom">Custom</option>
             <option value="vanilla">Vanilla</option>
             <option value="fabric">Fabric</option>
+            <option value="forge">Forge (executable JAR only)</option>
             <option value="paper">Paper</option>
           </select></label
         ><label class="field"

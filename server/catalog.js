@@ -11,6 +11,8 @@ const hosts = new Set([
   "fill-data.papermc.io",
   "api.modrinth.com",
   "cdn.modrinth.com",
+  "files.minecraftforge.net",
+  "maven.minecraftforge.net",
 ]);
 const err = (message) => Object.assign(new Error(message), { status: 400 });
 export function allowedUrl(value) {
@@ -39,13 +41,15 @@ export function safeFilename(name) {
 }
 export function createCatalog(fetcher = fetch) {
   const cache = new Map();
-  async function response(url) {
+  async function response(url, signal) {
     let next = allowedUrl(url);
     for (let i = 0; i < 5; i++) {
       const r = await fetcher(next, {
         headers: { "User-Agent": UA },
         redirect: "manual",
-        signal: AbortSignal.timeout(120000),
+        signal: signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(120000)])
+          : AbortSignal.timeout(120000),
       });
       if ([301, 302, 303, 307, 308].includes(r.status)) {
         next = allowedUrl(new URL(r.headers.get("location"), next).href);
@@ -112,11 +116,56 @@ export function createCatalog(fetcher = fetch) {
         loaders: [],
       };
     }
-    throw err("Choose Vanilla, Fabric, or Paper.");
+    if (platform === "forge") {
+      const versions = await json(
+        "https://files.minecraftforge.net/net/minecraftforge/forge/maven-metadata.json",
+      );
+      return {
+        versions: Object.keys(versions)
+          .filter(
+            (v) =>
+              /^1\.(1[7-9]|[2-9]\d)(\.\d+)?$/.test(v) ||
+              /^2[6-9]\.\d+(\.\d+)?$/.test(v),
+          )
+          .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
+          .map((v) => ({ value: v, label: v, stable: true })),
+        loaders: [],
+      };
+    }
+    throw err("Choose Vanilla, Fabric, Forge, or Paper.");
   }
   async function builds(platform, version) {
     if (platform === "fabric") return (await catalog("fabric")).loaders;
     if (platform === "vanilla") return [];
+    if (platform === "forge") {
+      if (!(await catalog("forge")).versions.some((v) => v.value === version))
+        throw err("Choose a supported Forge Minecraft version (1.17+).");
+      const metadata = await json(
+        "https://files.minecraftforge.net/net/minecraftforge/forge/maven-metadata.json",
+      );
+      const promotions = await json(
+        "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json",
+      );
+      return metadata[version]
+        .filter(
+          (v) =>
+            v.startsWith(version + "-") &&
+            /^[0-9.]+$/.test(v.slice(version.length + 1)),
+        )
+        .reverse()
+        .map((v) => {
+          const id = v.slice(version.length + 1);
+          return {
+            id,
+            stable: true,
+            label:
+              id +
+              (promotions.promos[version + "-recommended"] === id
+                ? " (recommended)"
+                : ""),
+          };
+        });
+    }
     if (platform !== "paper") throw err("Unsupported platform.");
     return (
       await json(
@@ -150,18 +199,33 @@ export function createCatalog(fetcher = fetch) {
         url: `https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(version)}/${encodeURIComponent(loader)}/${encodeURIComponent(list.installer)}/server/jar`,
       };
     }
-    const builds = await json(
+    if (platform === "forge") {
+      if (!(await builds(platform, version)).some((b) => b.id === loader))
+        throw err("Unknown Forge build.");
+      const coordinate = `${version}-${loader}`;
+      const url = `https://maven.minecraftforge.net/net/minecraftforge/forge/${coordinate}/forge-${coordinate}-installer.jar`;
+      const checksum = (await (await response(url + ".sha1")).text()).trim();
+      if (!/^[a-fA-F0-9]{40}$/.test(checksum))
+        throw err("Invalid Forge installer checksum.");
+      return {
+        url,
+        hashes: { sha1: checksum.toLowerCase() },
+        forge: true,
+        coordinate,
+      };
+    }
+    const buildsList = await json(
       `https://fill.papermc.io/v3/projects/paper/versions/${encodeURIComponent(version)}/builds`,
     );
-    const b = builds.find(
+    const b = buildsList.find(
       (b) => String(b.id) === String(loader) && b.channel === "STABLE",
     );
     if (!b) throw err("Choose a stable Paper build.");
     const d = b.downloads["server:default"];
     return { ...d, hashes: d.checksums };
   }
-  async function download(descriptor, destination) {
-    const r = await response(descriptor.url);
+  async function download(descriptor, destination, { signal } = {}) {
+    const r = await response(descriptor.url, signal);
     const handle = await fs.open(destination, "wx", 0o600);
     const algorithms = Object.keys(descriptor.hashes || {}).filter((x) =>
       ["sha1", "sha256", "sha512"].includes(x),
@@ -195,9 +259,9 @@ export function createCatalog(fetcher = fetch) {
   function context(s) {
     const platform = s.installation?.platform,
       version = s.installation?.version;
-    if (!["fabric", "paper"].includes(platform) || !version)
+    if (!["fabric", "forge", "paper"].includes(platform) || !version)
       throw err(
-        "Choose Fabric or Paper and a Minecraft version in Installation first.",
+        "Choose Fabric, Forge, or Paper and a Minecraft version in Installation first.",
       );
     return {
       platform,

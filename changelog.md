@@ -2,6 +2,18 @@
 
 Changes are recorded from 2026-09-23 onward.
 
+## 2026-10-23
+
+### Added
+- Official Forge installation for Minecraft 1.17+: Minecraft/build selection, recommended-build labels, official installer checksum verification, a bounded Java installer process with console output, and isolated runtime folders.
+- Both modern argument-list and recent shim-JAR Forge startup through generated argument files with Moss heap settings, keeping worlds/mods/configs at the existing server root. Failed installs preserve the previous selection; panel shutdown cancels active Forge installers. Older runtimes remain available on disk.
+- Compatible Forge mod browsing and required-dependency installation through Modrinth. Updated installation help, README and feature-gap inventory.
+
+### Validation
+- Forge tests cover metadata/build/checksum validation, compatible dependencies, failed installer cleanup, symlink rejection, runtime persistence, heap/argument launch, shim library publication/conflict checks, stopped-server requirements and switching back to Vanilla. Existing suites use a fake Java process.
+- All 17 automated tests, the production build, browser smoke checks (Forge selection/install plus compatible mods), and upstream integrity checks pass.
+- Live official Forge 1.20.1 / 47.4.0 installer completed in an isolated temporary directory. Its generated runtime reached Minecraft’s ready message and stopped cleanly using Moss-rewritten arguments on Java 17. Java 25 was incompatible with that older Forge runtime, as expected. No client join/modpack gameplay was tested; vendored Modrinth files remain unchanged.
+
 ## 2026-09-26
 
 ### Added

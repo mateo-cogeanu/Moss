@@ -260,7 +260,7 @@ try {
     .waitFor();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
 
-  await page.getByRole("radio", { name: "Fabric", exact: true }).click();
+  await page.getByRole("radio", { name: "Forge", exact: true }).click();
   await page
     .getByPlaceholder("Search game version...", { exact: true })
     .click();
@@ -275,6 +275,13 @@ try {
     })
     .waitFor();
   await page.getByRole("button", { name: "Dismiss", exact: true }).click();
+  const forgeRecord = JSON.parse(
+    await fs.readFile(path.join(root, "servers.json"), "utf8"),
+  ).find((s) => s.id === id);
+  assert.equal(forgeRecord.installation.platform, "forge");
+  await fs.access(
+    path.join(root, "servers", id, forgeRecord.installation.launch.argsFile),
+  );
   await page.getByRole("link", { name: "Mods & plugins", exact: true }).click();
   await page
     .getByRole("button", { name: "Browse content", exact: true })
