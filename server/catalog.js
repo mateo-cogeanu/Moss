@@ -1,3 +1,4 @@
+import { NEOFORGE_MAVEN, neoForgeVersions } from "./neoforge.js";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 const UA = "Moss/0.1 (personal server administration)";
@@ -13,6 +14,7 @@ const hosts = new Set([
   "cdn.modrinth.com",
   "files.minecraftforge.net",
   "maven.minecraftforge.net",
+  "maven.neoforged.net",
 ]);
 const err = (message) => Object.assign(new Error(message), { status: 400 });
 export function allowedUrl(value) {
@@ -75,6 +77,18 @@ export function createCatalog(fetcher = fetch) {
     cache.set(url, { value, expires: Date.now() + 300000 });
     return value;
   }
+  async function neoVersions(legacy = false) {
+    const url =
+      NEOFORGE_MAVEN + (legacy ? "forge" : "neoforge") + "/maven-metadata.xml";
+    const hit = cache.get(url);
+    if (hit && hit.expires > Date.now()) return hit.value;
+    const text = await (await response(url)).text();
+    if (text.length > 20 * 1024 * 1024)
+      throw err("NeoForge metadata response too large.");
+    const value = neoForgeVersions(text, legacy);
+    cache.set(url, { value, expires: Date.now() + 300000 });
+    return value;
+  }
   async function catalog(platform) {
     if (platform === "vanilla") {
       const m = await json(
@@ -132,11 +146,26 @@ export function createCatalog(fetcher = fetch) {
         loaders: [],
       };
     }
-    throw err("Choose Vanilla, Fabric, Forge, or Paper.");
+    if (platform === "neoforge") {
+      const versions = [...(await neoVersions()), ...(await neoVersions(true))];
+      return {
+        versions: [...new Set(versions.map((v) => v.minecraft))]
+          .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
+          .map((value) => ({ value, label: value, stable: true })),
+        loaders: [],
+      };
+    }
+    throw err("Choose Vanilla, Fabric, Forge, NeoForge, or Paper.");
   }
   async function builds(platform, version) {
     if (platform === "fabric") return (await catalog("fabric")).loaders;
     if (platform === "vanilla") return [];
+    if (platform === "neoforge") {
+      const versions = await neoVersions(version === "1.20.1");
+      const entries = versions.filter((v) => v.minecraft === version);
+      if (!entries.length) throw err("Unknown NeoForge Minecraft version.");
+      return entries.map((v) => ({ id: v.id, stable: v.stable, label: v.id }));
+    }
     if (platform === "forge") {
       if (!(await catalog("forge")).versions.some((v) => v.value === version))
         throw err("Choose a supported Forge Minecraft version (1.17+).");
@@ -199,6 +228,33 @@ export function createCatalog(fetcher = fetch) {
         url: `https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(version)}/${encodeURIComponent(loader)}/${encodeURIComponent(list.installer)}/server/jar`,
       };
     }
+    if (platform === "neoforge") {
+      const versions = await neoVersions(version === "1.20.1");
+      const build = versions.find(
+        (v) => v.minecraft === version && v.id === loader,
+      );
+      if (!build)
+        throw err("Unknown NeoForge build for this Minecraft version.");
+      const url = `${NEOFORGE_MAVEN}${build.artifact}/${build.coordinate}/${build.artifact}-${build.coordinate}-installer.jar`;
+      const checksum = (await (await response(url + ".sha256")).text()).trim();
+      if (!/^[a-fA-F0-9]{64}$/.test(checksum))
+        throw err("Invalid NeoForge installer checksum.");
+      return {
+        url,
+        hashes: { sha256: checksum.toLowerCase() },
+        forge: true,
+        platform: "neoforge",
+        coordinate: build.coordinate,
+        libraryPath: `libraries/net/neoforged/${build.artifact}`,
+        java:
+          version === "1.20.1" ||
+          (version.startsWith("1.20.") && +version.split(".")[2] < 5)
+            ? 17
+            : version.startsWith("1.")
+              ? 21
+              : 25,
+      };
+    }
     if (platform === "forge") {
       if (!(await builds(platform, version)).some((b) => b.id === loader))
         throw err("Unknown Forge build.");
@@ -259,9 +315,12 @@ export function createCatalog(fetcher = fetch) {
   function context(s) {
     const platform = s.installation?.platform,
       version = s.installation?.version;
-    if (!["fabric", "forge", "paper"].includes(platform) || !version)
+    if (
+      !["fabric", "forge", "neoforge", "paper"].includes(platform) ||
+      !version
+    )
       throw err(
-        "Choose Fabric, Forge, or Paper and a Minecraft version in Installation first.",
+        "Choose Fabric, Forge, NeoForge, or Paper and a Minecraft version in Installation first.",
       );
     return {
       platform,

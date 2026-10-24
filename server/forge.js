@@ -37,7 +37,7 @@ export function runInstaller(
       else
         reject(
           fail(
-            `Forge installer failed (${signal || code}). Check Java compatibility and the console. ${tail.slice(-1000)}`,
+            `Server installer failed (${signal || code}). Check Java compatibility and the console. ${tail.slice(-1000)}`,
           ),
         );
     });
@@ -52,7 +52,9 @@ export async function installForge({
   run = runInstaller,
   signal,
 }) {
-  const name = "forge-runtime-" + crypto.randomUUID();
+  const platform = descriptor.platform === "neoforge" ? "neoforge" : "forge";
+  const label = platform === "neoforge" ? "NeoForge" : "Forge";
+  const name = platform + "-runtime-" + crypto.randomUUID();
   const root = path.join(directory, name);
   await fs.mkdir(root, { mode: 0o700 });
   const published = [];
@@ -61,12 +63,12 @@ export async function installForge({
       signal,
     });
     signal?.throwIfAborted();
-    log("Installing Forge libraries. This can take several minutes…");
+    log(`Installing ${label} libraries. This can take several minutes…`);
     await run(java, "installer.jar", root, log, undefined, signal);
     signal?.throwIfAborted();
     const source = path.join(
       root,
-      "libraries/net/minecraftforge/forge",
+      descriptor.libraryPath || "libraries/net/minecraftforge/forge",
       descriptor.coordinate,
       "unix_args.txt",
     );
@@ -74,14 +76,14 @@ export async function installForge({
     async function check(folder) {
       for (const entry of await fs.readdir(folder, { withFileTypes: true })) {
         if (entry.isSymbolicLink())
-          throw fail("Forge installer output contains a symbolic link.");
+          throw fail(`${label} installer output contains a symbolic link.`);
         if (entry.isDirectory()) await check(path.join(folder, entry.name));
       }
     }
     await check(root);
     const args = await fs.readFile(source, "utf8");
     if (args.length > 1024 * 1024)
-      throw fail("Forge launch file is too large.");
+      throw fail(`${label} launch file is too large.`);
     let rewritten,
       sharedLibraries = false;
     const shim = `forge-${descriptor.coordinate}-shim.jar`;
@@ -134,9 +136,14 @@ export async function installForge({
       await publish(path.join(root, shim), path.join(directory, shim));
       rewritten = args;
     } else {
-      if (!args.includes("libraries/") || !args.includes("forgeserver"))
+      if (
+        !args.includes("libraries/") ||
+        !/(?:forgeserver|neoforgeserver|neoforge_server|net\.neoforged\.fml\.startup\.Server)/.test(
+          args,
+        )
+      )
         throw fail(
-          "Unsupported Forge server launch files. Select another build.",
+          `Unsupported ${label} server launch files. Select another build.`,
         );
       // Keep cwd at the server root so existing worlds, mods and icons work.
       rewritten = args

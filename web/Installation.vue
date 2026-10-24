@@ -38,31 +38,34 @@ async function load() {
   loading.value = false;
 }
 async function ensure() {
+  const p = platform.value,
+    v = version.value;
   try {
-    if (!catalogs.value[platform.value])
-      catalogs.value[platform.value] = await call(
-        "/installation/catalog?platform=" + platform.value,
-      );
+    if (!catalogs.value[p])
+      catalogs.value[p] = await call("/installation/catalog?platform=" + p);
     if (
-      ["paper", "forge"].includes(platform.value) &&
-      version.value &&
-      !paperBuilds.value[platform.value + ":" + version.value]
+      ["paper", "forge", "neoforge"].includes(p) &&
+      v &&
+      catalogs.value[p]?.versions.some((entry: any) => entry.value === v) &&
+      !paperBuilds.value[p + ":" + v]
     )
-      paperBuilds.value[platform.value + ":" + version.value] = await call(
+      paperBuilds.value[p + ":" + v] = await call(
         "/installation/builds?platform=" +
-          platform.value +
+          p +
           "&version=" +
-          encodeURIComponent(version.value),
+          encodeURIComponent(v),
       );
   } catch (e) {
-    notice.value = (e as Error).message;
+    if (platform.value === p && version.value === v)
+      notice.value = (e as Error).message;
   }
 }
+
 watch([platform, version], ensure);
 async function install(p: string, v: string, l: string | null) {
   if (
     !confirm(
-      `Install ${p} ${v}? This changes the server startup software. Forge installation can take several minutes. Your existing JARs and world files will be kept. Back up your world before changing Minecraft versions.`,
+      `Install ${p} ${v}? This changes the server startup software. Forge/NeoForge installation can take several minutes. Your existing JARs and world files will be kept. Back up your world before changing Minecraft versions.`,
     )
   )
     throw new Error("Installation cancelled.");
@@ -109,6 +112,14 @@ provideInstallationSettings({
         current.value.jar ||
         "server.jar",
     },
+    ...(current.value.installation?.java
+      ? [
+          {
+            label: "Java required",
+            value: String(current.value.installation.java),
+          },
+        ]
+      : []),
     {
       label: "Source",
       value: current.value.installation?.source || "Not installed",
@@ -118,7 +129,7 @@ provideInstallationSettings({
   isBusy: computed(() => busy.value || current.value.status !== "stopped"),
   busyMessage: computed(() =>
     busy.value
-      ? "Installing server software… See the console for Forge installer output."
+      ? "Installing server software… See the console for Forge/NeoForge installer output."
       : "Stop the server to change software.",
   ),
   modpack: ref(null),
@@ -130,7 +141,7 @@ provideInstallationSettings({
     () => current.value.installation?.loader || "",
   ),
   requiresInstallation: computed(() => !current.value.installation),
-  availablePlatforms: ["vanilla", "fabric", "forge", "paper"],
+  availablePlatforms: ["vanilla", "fabric", "forge", "neoforge", "paper"],
   editingPlatformRef: platform,
   editingGameVersionRef: version,
   resolveGameVersions: (p, snapshots) =>
@@ -138,7 +149,7 @@ provideInstallationSettings({
       (v: any) => snapshots || v.stable,
     ),
   resolveLoaderVersions: (p, v) =>
-    ["paper", "forge"].includes(p)
+    ["paper", "forge", "neoforge"].includes(p)
       ? paperBuilds.value[p + ":" + v] || []
       : catalogs.value[p]?.loaders || [],
   resolveHasSnapshots: (p) =>
@@ -178,10 +189,10 @@ onMounted(async () => {
         Server software
       </h2>
       <p class="text-secondary">
-        Install Vanilla, Fabric, Forge (Minecraft 1.17+), or a stable Paper
-        build from its official source. Forge downloads its libraries using the
-        selected Java runtime. Use a Java version compatible with your selected
-        release.
+        Install Vanilla, Fabric, Forge (Minecraft 1.17+), NeoForge, or a stable
+        Paper build from its official source. Forge and NeoForge download their
+        libraries using the selected Java runtime. Use a Java version compatible
+        with your selected release.
       </p>
       <Layout />
     </div>
@@ -194,8 +205,9 @@ onMounted(async () => {
       </h2>
       <p class="m-0 text-secondary">
         Upload a runnable JAR in Files, then select it here. Choose its actual
-        platform and game version to filter compatible mods/plugins. A Forge
-        installer JAR cannot be used here; select Forge above to install it.
+        platform and game version to filter compatible mods/plugins. A
+        Forge/NeoForge installer JAR cannot be used here; select Forge or
+        NeoForge above to install it.
       </p>
       <Combobox
         v-model="jar"
@@ -209,6 +221,7 @@ onMounted(async () => {
             <option value="vanilla">Vanilla</option>
             <option value="fabric">Fabric</option>
             <option value="forge">Forge (executable JAR only)</option>
+            <option value="neoforge">NeoForge (executable JAR only)</option>
             <option value="paper">Paper</option>
           </select></label
         ><label class="field"

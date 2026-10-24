@@ -25,7 +25,7 @@ const items = ref<any[]>([]),
   plan = ref<any[]>([]);
 const compatible = computed(
   () =>
-    ["fabric", "forge", "paper"].includes(
+    ["fabric", "forge", "neoforge", "paper"].includes(
       current.value.installation?.platform,
     ) && current.value.installation?.version,
 );
@@ -90,7 +90,7 @@ async function install() {
 function browse() {
   if (!compatible.value) {
     notice.value =
-      "Choose Fabric, Forge, or Paper and a Minecraft version in Installation to browse compatible content.";
+      "Choose Fabric, Forge, NeoForge, or Paper and a Minecraft version in Installation to browse compatible content.";
     router.push(`/server/${id}/installation`);
     return;
   }

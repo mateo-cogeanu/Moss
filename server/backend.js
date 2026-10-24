@@ -168,8 +168,12 @@ export async function createBackend({
     if (runtime.get(s.id)?.child) throw fail(409, "Server is already running.");
     const jar = s.jar || "server.jar";
     const launch = s.installation?.launch;
-    if (launch?.type === "forge-args") {
-      if (!/^forge-runtime-[a-f0-9-]+\/moss_args\.txt$/.test(launch.argsFile))
+    if (["forge-args", "neoforge-args"].includes(launch?.type)) {
+      if (
+        !/^(?:forge|neoforge)-runtime-[a-f0-9-]+\/moss_args\.txt$/.test(
+          launch.argsFile,
+        )
+      )
         throw fail(400, "Invalid Forge launch path.");
       await tree(await safe(s, launch.argsFile.split("/")[0]));
       if (launch.sharedLibraries) {
@@ -193,7 +197,7 @@ export async function createBackend({
       [
         `-Xms${Math.min(s.memory, 1024)}M`,
         `-Xmx${s.memory}M`,
-        ...(launch?.type === "forge-args"
+        ...(["forge-args", "neoforge-args"].includes(launch?.type)
           ? ["@" + launch.argsFile]
           : ["-jar", jar]),
         "nogui",
@@ -578,9 +582,14 @@ export async function createBackend({
             )
               throw fail(400, "Select an existing executable JAR.");
             if (
-              !["vanilla", "fabric", "forge", "paper", "custom"].includes(
-                b.platform,
-              ) ||
+              ![
+                "vanilla",
+                "fabric",
+                "forge",
+                "neoforge",
+                "paper",
+                "custom",
+              ].includes(b.platform) ||
               typeof b.version !== "string" ||
               b.version.length > 80
             )
@@ -611,7 +620,12 @@ export async function createBackend({
                 directory: await safe(s, ""),
                 java,
                 signal: controller.signal,
-                log: (text) => log(s.id, "[Forge] " + text),
+                log: (text) =>
+                  log(
+                    s.id,
+                    `[${b.platform === "neoforge" ? "NeoForge" : "Forge"}] ` +
+                      text,
+                  ),
               });
               forgeInstalls.set(s.id, { controller, task });
               let launch;
@@ -621,16 +635,21 @@ export async function createBackend({
                 forgeInstalls.delete(s.id);
               }
               s.installation = {
-                platform: "forge",
+                platform: b.platform,
                 version: b.version,
                 loader: b.loader,
                 source: "official",
-                launch,
+                launch: {
+                  ...launch,
+                  type:
+                    b.platform === "neoforge" ? "neoforge-args" : "forge-args",
+                },
+                java: d.java || null,
               };
               await save();
               log(
                 s.id,
-                "[Panel] Forge installed. Existing worlds, mods and previous runtimes were kept.",
+                `[Panel] ${b.platform === "neoforge" ? "NeoForge" : "Forge"} installed. Existing worlds, mods and previous runtimes were kept.`,
               );
               return send(200, info(s));
             }

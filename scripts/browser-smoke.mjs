@@ -282,6 +282,34 @@ try {
   await fs.access(
     path.join(root, "servers", id, forgeRecord.installation.launch.argsFile),
   );
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("radio", { name: "NeoForge", exact: true }).click();
+  await page
+    .getByPlaceholder("Search game version...", { exact: true })
+    .click();
+  await page.getByRole("option", { name: "1.21.1", exact: true }).click();
+  await page.waitForTimeout(300);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page
+    .getByText("Server software installed. You can now start the server.", {
+      exact: true,
+    })
+    .waitFor();
+  await page.getByRole("button", { name: "Dismiss", exact: true }).click();
+  const neoRecord = JSON.parse(
+    await fs.readFile(path.join(root, "servers.json"), "utf8"),
+  ).find((s) => s.id === id);
+  assert.equal(neoRecord.installation.platform, "neoforge");
+  assert.equal(neoRecord.installation.version, "1.21.1");
+  assert.equal(neoRecord.installation.launch.type, "neoforge-args");
+  await fs.access(
+    path.join(root, "servers", id, neoRecord.installation.launch.argsFile),
+  );
+  await page.screenshot({
+    path: "artifacts/neoforge-installation.png",
+    fullPage: true,
+  });
   await page.getByRole("link", { name: "Mods & plugins", exact: true }).click();
   await page
     .getByRole("button", { name: "Browse content", exact: true })

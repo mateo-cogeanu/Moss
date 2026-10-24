@@ -2,6 +2,20 @@
 
 Changes are recorded from 2026-09-23 onward.
 
+## 2026-10-24
+
+### Added
+- NeoForge installation and mod browsing, using official Maven release metadata and SHA-256 installer verification. Maps Minecraft 1.20.1's legacy artifact, 1.20.2+ release lines and year-based versions; beta/alpha builds are labelled and snapshot-specific coordinates are excluded.
+- NeoForge runtime staging, direct Java argument-file startup, persisted launch selection, Java requirement display and compatible required-dependency handling. Shared Forge installer safeguards continue to protect existing worlds, mods and prior selections.
+
+### Fixed
+- Avoid incompatible-version build requests and stale error notices when switching installation platforms.
+
+### Validation
+- All 21 automated tests cover NeoForge metadata mapping, artifact/build/checksum validation, mod compatibility and dependency filtering, multiple release-family installs, persisted startup, heap arguments, stopped-server restrictions and switching back to Forge.
+- Production build, browser smoke checks (Forge followed by NeoForge 1.21.1 installation and mod/dependency installation), and upstream integrity checks pass. Vendored Modrinth files are unchanged.
+- A real NeoForge 21.1.262 / Minecraft 1.21.1 server was installed through the Moss API, reached Minecraft's ready message and stopped cleanly on Java 21 in an isolated temporary directory. Other version families have fixture coverage and launch-file inspection, not full live gameplay testing; no client join/modpack gameplay was tested.
+
 ## 2026-10-23
 
 ### Added
