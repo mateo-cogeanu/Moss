@@ -9,11 +9,27 @@ import os from "node:os";
 import path from "node:path";
 import assert from "node:assert/strict";
 const root = await fs.mkdtemp(path.join(os.tmpdir(), "moss-browser-"));
+let manualUpdateRequests = 0;
+const manualUpdateState = {
+  enabled: false,
+  manualAvailable: true,
+  status: "disabled",
+  message: "Automatic updates are disabled.",
+};
 const backend = await createBackend({
   dataDir: root,
   java: path.resolve("test/fake-java.js"),
   token: "browser-test-token",
   fetcher: catalogFixture,
+  updateStatus: () => manualUpdateState,
+  updateNow: () => {
+    manualUpdateRequests++;
+    Object.assign(manualUpdateState, {
+      status: "current",
+      message: "Moss is up to date.",
+    });
+    return { ...manualUpdateState };
+  },
 });
 await new Promise((r) => backend.server.listen(0, "127.0.0.1", r));
 const base = `http://127.0.0.1:${backend.server.address().port}`;
@@ -411,6 +427,22 @@ try {
   await page
     .getByRole("heading", { name: "Your servers", exact: true })
     .waitFor();
+  const updateButton = page.getByRole("button", {
+    name: "Update now",
+    exact: true,
+  });
+  await updateButton.waitFor();
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await updateButton.click();
+  assert.equal(manualUpdateRequests, 0);
+  page.once("dialog", (dialog) => {
+    assert.match(dialog.message(), /save and stop all Minecraft servers/);
+    return dialog.accept();
+  });
+  await updateButton.click();
+  await page.getByText("Moss is up to date.", { exact: true }).waitFor();
+  assert.equal(manualUpdateRequests, 1);
+  await page.screenshot({ path: "artifacts/update-now.png", fullPage: true });
   assert.deepEqual(errors, []);
   assert.deepEqual(remote, []);
   console.log("Browser smoke test passed.");

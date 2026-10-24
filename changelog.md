@@ -5,15 +5,19 @@ Changes are recorded from 2026-09-23 onward.
 ## 2026-10-24
 
 ### Added
+- Authenticated **Update now** button with confirmation, immediate GitHub checks and checking/stopping/installing/error feedback. Manual updates also work when scheduled updates are disabled and can explicitly retry a failed revision. No available update means games keep running.
+- Manual update preparation pauses new changes, waits for active writes and asks every Minecraft server to save/stop. A slow or stuck operation/server cancels the update without force-killing the game. After updating, sign in and start games again.
 - NeoForge installation and mod browsing, using official Maven release metadata and SHA-256 installer verification. Maps Minecraft 1.20.1's legacy artifact, 1.20.2+ release lines and year-based versions; beta/alpha builds are labelled and snapshot-specific coordinates are excluded.
 - NeoForge runtime staging, direct Java argument-file startup, persisted launch selection, Java requirement display and compatible required-dependency handling. Shared Forge installer safeguards continue to protect existing worlds, mods and prior selections.
 
 ### Fixed
+- Read-only UI polling no longer prevents update admission. Update checks/pending states are logged, error details are exposed to signed-in administrators, and updater dependency installs explicitly include build tools even under production npm settings.
 - Avoid incompatible-version build requests and stale error notices when switching installation platforms.
 
 ### Validation
-- All 21 automated tests cover NeoForge metadata mapping, artifact/build/checksum validation, mod compatibility and dependency filtering, multiple release-family installs, persisted startup, heap arguments, stopped-server restrictions and switching back to Forge.
-- Production build, browser smoke checks (Forge followed by NeoForge 1.21.1 installation and mod/dependency installation), and upstream integrity checks pass. Vendored Modrinth files are unchanged.
+- All 25 automated tests pass. Manual-update coverage includes authentication/origin/confirmation requirements, disabled schedules, duplicate checks, no-update/dirty-checkout behavior, explicit failed-revision retry, stopping games before worker launch, busy-request cancellation and refusing to force-kill unresponsive Minecraft processes. Systemd operations are simulated; no home-server deployment was performed.
+- Existing tests cover NeoForge metadata mapping, artifact/build/checksum validation, mod compatibility and dependency filtering, multiple release-family installs, persisted startup, heap arguments, stopped-server restrictions and switching back to Forge.
+- Production build, browser smoke checks (Forge followed by NeoForge 1.21.1 installation, mod/dependency installation, and Update now confirmation/cancellation/status), and upstream integrity checks pass. Vendored Modrinth files are unchanged.
 - A real NeoForge 21.1.262 / Minecraft 1.21.1 server was installed through the Moss API, reached Minecraft's ready message and stopped cleanly on Java 21 in an isolated temporary directory. Other version families have fixture coverage and launch-file inspection, not full live gameplay testing; no client join/modpack gameplay was tested.
 
 ## 2026-10-23

@@ -57,6 +57,7 @@ export function createUpdater({
 }) {
   const state = {
     enabled,
+    manualAvailable: platform === "linux",
     status: enabled ? "waiting" : "disabled",
     message: enabled
       ? "Automatic updates enabled. First check in one minute."
@@ -68,17 +69,19 @@ export function createUpdater({
   let timer,
     checking = false,
     stopped = false;
-  async function check() {
-    if (!enabled || checking || stopped) return;
-    clearTimeout(timer);
-    checking = true;
+  function report(status, message) {
+    state.status = status;
+    state.message = message;
+    console.log(`[Moss updates] ${message}`);
+  }
+  async function performCheck(manual) {
+    let maintenance = false;
     try {
       if (platform !== "linux")
         throw new Error("Automatic updates require Linux with user systemd.");
       if (!/^[a-zA-Z0-9_-]+\.service$/.test(service))
         throw new Error("Invalid Moss service name.");
-      state.status = "checking";
-      state.message = "Checking GitHub for a Moss update…";
+      report("checking", "Checking GitHub for a Moss update…");
       const owner = await run(
         "systemctl",
         ["--user", "show", service, "--property=MainPID", "--value"],
@@ -94,21 +97,34 @@ export function createUpdater({
       state.latest = update.target.slice(0, 7);
       if (stopped) return;
       if (!update.available) {
-        state.status = "current";
-        state.message = "Moss is up to date.";
-      } else if (update.failed) {
+        report("current", "Moss is up to date.");
+      } else if (update.failed && !manual) {
         state.status = "error";
         state.message =
           "The latest Moss update previously failed. Previous version restored if recovery succeeded; inspect the moss-update journal before retrying.";
-      } else if (!backend.beginUpdate()) {
-        state.status = "pending";
-        state.message =
-          "Moss update available. Waiting for all Minecraft servers and active operations to stop.";
       } else {
-        state.status = "installing";
-        state.message =
-          "Updating Moss. The panel will restart; sign in again afterward.";
-        console.log(state.message);
+        if (manual) {
+          report(
+            "stopping",
+            "Preparing update: waiting for active changes, then saving and stopping Minecraft servers…",
+          );
+          await backend.prepareUpdate();
+          maintenance = true;
+        } else {
+          maintenance = backend.beginUpdate();
+          if (!maintenance) {
+            report(
+              "pending",
+              "Moss update available. Waiting for all Minecraft servers and active operations to stop.",
+            );
+            return;
+          }
+        }
+        if (stopped) return;
+        report(
+          "installing",
+          "Updating Moss. The panel will restart; sign in again afterward. Minecraft servers will remain stopped.",
+        );
         try {
           await run(
             "systemd-run",
@@ -133,21 +149,58 @@ export function createUpdater({
             21 * 60 * 1000,
           );
         } finally {
-          backend.endUpdate();
+          if (maintenance) {
+            backend.endUpdate();
+            maintenance = false;
+          }
         }
       }
     } catch (error) {
       state.status = "error";
-      state.message = `Automatic update failed: ${error.message.split("\n")[0]}. See the user journal for details.`;
+      const detail = error.stderr?.trim() || error.message;
+      state.message = `Moss update failed: ${detail.slice(-1500)}. See the user journal for details.`;
       console.error(state.message);
     } finally {
+      if (maintenance) backend.endUpdate();
       checking = false;
-      if (!stopped) timer = setTimeout(check, intervalMs).unref();
+      if (!stopped && enabled) timer = setTimeout(check, intervalMs).unref();
     }
+  }
+  async function check() {
+    if (!enabled || checking || stopped) return;
+    clearTimeout(timer);
+    checking = true;
+    await performCheck(false);
+  }
+  function requestUpdate() {
+    if (platform !== "linux")
+      throw Object.assign(
+        new Error("Update now requires Linux with a user systemd service."),
+        { status: 400 },
+      );
+    if (checking || stopped)
+      throw Object.assign(
+        new Error("An update check or shutdown is already in progress."),
+        { status: 409 },
+      );
+    clearTimeout(timer);
+    checking = true;
+    state.status = "checking";
+    state.message = "Checking GitHub for a Moss update…";
+    // Allow the HTTP response to finish before maintenance blocks mutations.
+    setImmediate(() => {
+      if (stopped) {
+        checking = false;
+        return;
+      }
+      void performCheck(true);
+    });
+    return { ...state };
   }
   return {
     state,
     check,
+    requestUpdate,
     start() {
       if (enabled) timer = setTimeout(check, 60000).unref();
     },

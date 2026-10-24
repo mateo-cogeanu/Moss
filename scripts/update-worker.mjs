@@ -57,7 +57,7 @@ export async function applyUpdate({
     }
     await git("merge", "--ff-only", target);
     movedCode = true;
-    await run("npm", ["ci"], repo, 10 * 60 * 1000);
+    await run("npm", ["ci", "--include=dev"], repo, 10 * 60 * 1000);
     await run("npm", ["run", "build"], repo, 5 * 60 * 1000);
     await systemctl("start");
     await health({ host, port, run, repo, service });

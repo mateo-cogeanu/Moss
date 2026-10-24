@@ -19,6 +19,8 @@ export async function createBackend({
   staticDir = "./dist",
   token: configuredToken,
   fetcher = fetch,
+  updateNow,
+  updateDrainTimeout = 120000,
   updateStatus = () => ({
     enabled: false,
     status: "disabled",
@@ -75,7 +77,7 @@ export async function createBackend({
   let saveQueue = Promise.resolve(),
     closing = false,
     updating = false,
-    activeRequests = 0;
+    activeMutations = 0;
   async function save() {
     const content = JSON.stringify(records, null, 2);
     saveQueue = saveQueue.then(async () => {
@@ -252,15 +254,32 @@ export async function createBackend({
     );
     return info(s);
   }
-  async function stop(s, kill = false) {
+  async function stop(s, kill = false, gracefulOnly = false) {
     const r = runtime.get(s.id);
     if (!r?.child) return info(s);
     r.stopping = true;
     if (kill) r.child.kill("SIGKILL");
     else r.child.stdin.write("stop\n");
-    const timer = setTimeout(() => r.child?.kill("SIGKILL"), stopTimeout);
+    let timer;
     try {
-      await r.done;
+      await Promise.race([
+        r.done,
+        new Promise((resolve, reject) => {
+          timer = setTimeout(() => {
+            if (gracefulOnly)
+              reject(
+                fail(
+                  409,
+                  `${s.name} did not stop cleanly within ${stopTimeout / 1000} seconds. Update cancelled; wait for it to stop and retry.`,
+                ),
+              );
+            else {
+              r.child?.kill("SIGKILL");
+              r.done.then(resolve);
+            }
+          }, stopTimeout);
+        }),
+      ]);
     } finally {
       clearTimeout(timer);
     }
@@ -332,7 +351,8 @@ export async function createBackend({
     };
   }
   const server = http.createServer(async (req, res) => {
-    activeRequests++;
+    const mutation = !["GET", "HEAD"].includes(req.method);
+    if (mutation) activeMutations++;
     const send = (status, value) => {
       res.writeHead(status, {
         "Content-Type": "application/json",
@@ -359,6 +379,17 @@ export async function createBackend({
         if (!user) throw fail(401, "Sign in to your account.");
         if (url.pathname === "/api/updates" && req.method === "GET")
           return send(200, updateStatus());
+        if (url.pathname === "/api/updates" && req.method === "POST") {
+          const body = await jsonBody(req);
+          if (body.confirm !== true)
+            throw fail(
+              400,
+              "Confirm that Minecraft servers may be stopped to update Moss.",
+            );
+          if (!updateNow)
+            throw fail(503, "Update now is unavailable in this deployment.");
+          return send(202, updateNow());
+        }
         if (url.pathname === "/api/session")
           return send(200, { username: user.username });
         if (url.pathname === "/api/world-imports" && req.method === "PUT") {
@@ -1131,7 +1162,7 @@ export async function createBackend({
       );
       if (!e.status && !e.code) console.error(e);
     } finally {
-      activeRequests--;
+      if (mutation) activeMutations--;
     }
   });
   return {
@@ -1142,13 +1173,39 @@ export async function createBackend({
       if (
         closing ||
         updating ||
-        activeRequests ||
+        activeMutations ||
         locks.size ||
         [...runtime.values()].some((r) => r.child)
       )
         return false;
       updating = true;
       return true;
+    },
+    async prepareUpdate() {
+      if (closing || updating)
+        throw fail(409, "Moss is already shutting down or updating.");
+      updating = true;
+      try {
+        const deadline = Date.now() + updateDrainTimeout;
+        while (activeMutations || locks.size) {
+          if (closing) throw fail(503, "Moss is shutting down.");
+          if (Date.now() >= deadline)
+            throw fail(
+              409,
+              "Active changes have not finished. Update cancelled; let them complete and retry.",
+            );
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        const results = await Promise.allSettled(
+          records.map((s) => stop(s, false, true)),
+        );
+        const failure = results.find((r) => r.status === "rejected");
+        if (failure) throw failure.reason;
+        if (closing) throw fail(503, "Moss is shutting down.");
+      } catch (error) {
+        updating = false;
+        throw error;
+      }
     },
     endUpdate() {
       updating = false;

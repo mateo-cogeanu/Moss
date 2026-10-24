@@ -5,6 +5,7 @@ const backend = await createBackend({
   dataDir: process.env.DATA_DIR || "./panel-data",
   java: process.env.JAVA_BIN || "java",
   updateStatus: () => updater.state,
+  updateNow: () => updater.requestUpdate(),
 });
 const port = Number(process.env.PORT || 3000),
   host = process.env.HOST || "127.0.0.1";
